@@ -13,8 +13,3 @@ ungoogled-chromium/macos/set-rustc-nightly-capability.patch
 
 arrow/extra/add-extra-channel-info.patch
 arrow/extra/change-chromium-branding.patch
-arrow/extra/change-keychain-name.patch
-arrow/extra/change-product-dir-name.patch
-arrow/extra/make-duck-duck-go-default.patch
-arrow/extra/always-use-better-ntp.patch
-arrow/extra/clean-new-tab-page.patch
