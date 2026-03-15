@@ -11,5 +11,5 @@ ungoogled-chromium/macos/build-bindgen-target-override.patch
 ungoogled-chromium/macos/bindgen-disable-static.patch
 ungoogled-chromium/macos/set-rustc-nightly-capability.patch
 
-arrow/extra/add-extra-channel-info.patch
 arrow/extra/change-chromium-branding.patch
+arrow/ui/arrow-custom-sidepanel.patch
