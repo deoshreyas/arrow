@@ -1,0 +1,485 @@
+diff --git a/chrome/browser/ui/tabs/features.cc b/chrome/browser/ui/tabs/features.cc
+index dfe2538c49..6e8685ee63 100644
+--- a/chrome/browser/ui/tabs/features.cc
++++ b/chrome/browser/ui/tabs/features.cc
+@@ -15,7 +15,7 @@ BASE_FEATURE(kDebugUITabStrip, base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ BASE_FEATURE(kTabGroupHome, base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+-BASE_FEATURE(kVerticalTabs, base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kVerticalTabs, base::FEATURE_ENABLED_BY_DEFAULT);
+ 
+ BASE_FEATURE(kTabSelectionByPointer, base::FEATURE_ENABLED_BY_DEFAULT);
+ 
+diff --git a/chrome/browser/ui/tabs/tab_strip_prefs.cc b/chrome/browser/ui/tabs/tab_strip_prefs.cc
+index df9da41576..affe06a2b1 100644
+--- a/chrome/browser/ui/tabs/tab_strip_prefs.cc
++++ b/chrome/browser/ui/tabs/tab_strip_prefs.cc
+@@ -32,7 +32,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+   registry->RegisterBooleanPref(prefs::kTabSearchRightAligned,
+                                 GetDefaultTabSearchRightAligned());
+   registry->RegisterBooleanPref(
+-      prefs::kVerticalTabsEnabled, false,
++      prefs::kVerticalTabsEnabled, true,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+ }
+ 
+diff --git a/chrome/browser/ui/tabs/tab_style.cc b/chrome/browser/ui/tabs/tab_style.cc
+index 7f1003ce07..55fd04bf48 100644
+--- a/chrome/browser/ui/tabs/tab_style.cc
++++ b/chrome/browser/ui/tabs/tab_style.cc
+@@ -201,13 +201,8 @@ SkColor TabStyle::GetTabForegroundColor(
+     return gfx::kPlaceholderColor;
+   }
+ 
+-  static constexpr std::array<std::array<ChromeColorIds, 2>, 2> kColorIds = {
+-      {{kColorTabForegroundInactiveFrameInactive,
+-        kColorTabForegroundInactiveFrameActive},
+-       {kColorTabForegroundActiveFrameInactive,
+-        kColorTabForegroundActiveFrameActive}}};
+-
+-  return color_provider->GetColor(kColorIds[apparently_active][frame_active]);
++  // Change tab font color to white
++  return SkColorSetARGB(255, 255, 255, 255);
+ }
+ 
+ SkColor TabStyle::GetTabBackgroundColor(
+@@ -221,10 +216,8 @@ SkColor TabStyle::GetTabBackgroundColor(
+ 
+   switch (state) {
+     case TabStyle::TabSelectionState::kActive: {
+-      constexpr std::array<ui::ColorId, 2> kActiveColorIds = {
+-          kColorTabBackgroundActiveFrameInactive,
+-          kColorTabBackgroundActiveFrameActive};
+-      return color_provider->GetColor(kActiveColorIds[frame_active]);
++      // Change background color of the active tab
++      return SkColorSetARGB(255, 115, 136, 232);
+     }
+     case TabStyle::TabSelectionState::kSelected: {
+       constexpr std::array<std::array<ui::ColorId, 2>, 2> kSelectedColorIds = {
+@@ -235,12 +228,9 @@ SkColor TabStyle::GetTabBackgroundColor(
+       return color_provider->GetColor(kSelectedColorIds[hovered][frame_active]);
+     }
+     case TabStyle::TabSelectionState::kInactive: {
+-      constexpr std::array<std::array<ui::ColorId, 2>, 2> kInactiveColorIds = {
+-          {{kColorTabBackgroundInactiveFrameInactive,
+-            kColorTabBackgroundInactiveFrameActive},
+-           {kColorTabBackgroundInactiveHoverFrameInactive,
+-            kColorTabBackgroundInactiveHoverFrameActive}}};
+-      return color_provider->GetColor(kInactiveColorIds[hovered][frame_active]);
++      // Make tabs transparent by default
++      // BUG: Also breaks the hover animation.
++      return SkColorSetARGB(0, 0, 0, 0);
+     }
+     default:
+       NOTREACHED();
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index 4735d88a2c..abd77c0407 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -236,7 +236,9 @@ FullscreenToolbarStyle GetUserPreferredToolbarStyle(bool always_show) {
+ }
+ 
+ int BrowserFrameViewMac::GetTopInset(bool restored) const {
+-  return 0;
++  // Position the mac traffic lights (close, minimize, maximize) properly with
++  // padding from the top of the window.
++  return 45;
+ }
+ 
+ void BrowserFrameViewMac::UpdateFullscreenTopUI() {
+@@ -525,7 +527,8 @@ FullscreenToolbarStyle GetUserPreferredToolbarStyle(bool always_show) {
+     return;
+   }
+ 
+-  SkColor frame_color = GetFrameColor(BrowserFrameActiveState::kUseCurrent);
++  // Background color of the browser frame
++  SkColor frame_color = SkColorSetARGB(255, 60, 98, 60);
+   canvas->DrawColor(frame_color);
+ 
+   auto* theme_service = ThemeServiceFactory::GetForProfile(
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+index 800057d70f..cdeb1d49bb 100644
+--- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+@@ -501,6 +501,10 @@ - (NSTouchBar*)makeTouchBar {
+     views::Widget::InitParams::Ownership ownership) {
+   views::Widget::InitParams params(ownership);
+   params.native_widget = this;
++
++  // Make browser window transparent
++  params.opacity = views::Widget::InitParams::WindowOpacity::kTranslucent;
++  
+   return params;
+ }
+ 
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 1baa4c4fab..9f22eb28a4 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -883,7 +883,6 @@ class PanelResizeHandle : public views::View,
+     SetLayoutManager(std::make_unique<views::FillLayout>());
+     AddChildView(std::make_unique<views::ResizeArea>(this));
+     SetPreferredSize(gfx::Size(kResizeHandleWidth, 1));
+-    SetBackground(views::CreateSolidBackground(kColorToolbarSeparator));
+   }
+ 
+   PanelResizeHandle(const PanelResizeHandle&) = delete;
+@@ -925,7 +924,7 @@ class PanelResizeHandle : public views::View,
+     }
+   }
+ 
+-  static constexpr int kResizeHandleWidth = 5;
++  static constexpr int kResizeHandleWidth = 1;
+ 
+   raw_ptr<views::View> left_panel_ = nullptr;
+   const int min_left_width_;
+@@ -948,8 +947,15 @@ class SidePanelView : public views::View, public views::TextfieldController {
+           views::BoxLayout::Orientation::kVertical, gfx::Insets(8), 8));
+ 
+       auto* nav_container = AddChildView(std::make_unique<views::View>());
+-      nav_container->SetLayoutManager(std::make_unique<views::BoxLayout>(
+-          views::BoxLayout::Orientation::kHorizontal, gfx::Insets::TLBR(20, 0, 0, 0), 4));
++      auto* nav_layout = nav_container->SetLayoutManager(std::make_unique<views::BoxLayout>(
++          views::BoxLayout::Orientation::kHorizontal, gfx::Insets::TLBR(5, 4, 0, 4), 4));
++      
++      auto* left_spacer = nav_container->AddChildView(std::make_unique<views::View>());
++#if BUILDFLAG(IS_MAC)
++      constexpr int kMacTrafficLightReservedWidth = 80;
++      left_spacer->SetPreferredSize(gfx::Size(kMacTrafficLightReservedWidth, 1));
++#endif
++      nav_layout->SetFlexForView(left_spacer, 1);
+ 
+       auto make_nav_button = [this](int command_id,
+                                     const gfx::VectorIcon& icon,
+@@ -966,7 +972,7 @@ class SidePanelView : public views::View, public views::TextfieldController {
+ 
+         button->SetTooltipText(tooltip);
+         button->SetAccessibleName(tooltip);
+-        button->SetPreferredSize(gfx::Size(40, 40));
++        button->SetPreferredSize(gfx::Size(30, 30));
+         views::InstallCircleHighlightPathGenerator(button.get());
+         return button;
+       };
+@@ -981,25 +987,33 @@ class SidePanelView : public views::View, public views::TextfieldController {
+       auto* search_container = AddChildView(std::make_unique<views::View>());
+       auto* search_layout = search_container->SetLayoutManager(
+           std::make_unique<views::BoxLayout>(
+-              views::BoxLayout::Orientation::kHorizontal, gfx::Insets::VH(6, 10),
++              views::BoxLayout::Orientation::kHorizontal, gfx::Insets::VH(2, 5),
+               8));
++      
++      SkColor search_bar_foreground_color = SkColorSetARGB(255, 255, 255, 255);
++      SkColor search_bar_background_color = SkColorSetARGB(255, 115, 136, 232);
+ 
+-      search_container->SetBackground(views::CreateRoundedRectBackground(
+-          kColorLocationBarBackground, 30));
++      search_container->SetBackground(
++          views::CreateRoundedRectBackground(search_bar_background_color, 10));
+ 
+       search_container->AddChildView(std::make_unique<views::ImageView>(
+           ui::ImageModel::FromVectorIcon(vector_icons::kSearchChromeRefreshIcon,
+-                                        ui::kColorIcon)));
++                                        search_bar_foreground_color)));
+ 
+       search_bar_ = search_container->AddChildView(std::make_unique<views::Textfield>());
+       search_bar_->SetPlaceholderText(u"Search or enter address");
+       search_bar_->SetBorder(nullptr);
+-      search_bar_->SetBackgroundColor(kColorLocationBarBackground);
++      search_bar_->SetBackgroundColor(search_bar_background_color);
+       search_layout->SetFlexForView(search_bar_, 1);
+ 
+       search_bar_->SetController(this);
+ 
+       root_layout->SetFlexForView(search_container, 0);
++
++      // Host to attach the vertical tab strip
++      tabs_host_ = AddChildView(std::make_unique<views::View>());
++      tabs_host_->SetLayoutManager(std::make_unique<views::FillLayout>());
++      root_layout->SetFlexForView(tabs_host_, 1);
+     }
+ 
+     SidePanelView(const SidePanelView&) = delete;
+@@ -1010,6 +1024,7 @@ class SidePanelView : public views::View, public views::TextfieldController {
+     views::ImageButton* forward_button() const { return forward_button_; }
+     views::ImageButton* refresh_button() const { return refresh_button_; }
+     views::Textfield* search_bar() const { return search_bar_; }
++    views::View* tabs_host() const { return tabs_host_; }
+   
+   private:
+     raw_ptr<Browser> browser_ = nullptr;
+@@ -1017,6 +1032,7 @@ class SidePanelView : public views::View, public views::TextfieldController {
+     raw_ptr<views::ImageButton> forward_button_ = nullptr;
+     raw_ptr<views::ImageButton> refresh_button_ = nullptr;
+     raw_ptr<views::Textfield> search_bar_ = nullptr;
++    raw_ptr<views::View> tabs_host_ = nullptr;
+ 
+     bool HandleKeyEvent(views::Textfield* sender,
+                         const ui::KeyEvent& key_event) override {
+@@ -1122,7 +1138,7 @@ BrowserView::BrowserView(Browser* browser)
+   web_container->layer()->SetFillsBoundsOpaquely(false);
+   const gfx::RoundedCornersF kWebCorners(15.f);
+   web_container->SetLayoutManager(std::make_unique<views::FillLayout>());
+-  web_container->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(10, 10, 10, 10)));
++  web_container->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(10, 0, 10, 10)));
+   auto multi_contents_view = std::make_unique<MultiContentsView>(
+     this, std::make_unique<MultiContentsViewDelegateImpl>(*browser_));
+   multi_contents_view_ = web_container->AddChildView(std::move(multi_contents_view));
+@@ -1152,7 +1168,6 @@ BrowserView::BrowserView(Browser* browser)
+   
+   // Hide the toolbar and top container
+   toolbar_->SetVisible(false);
+-  top_container_->SetVisible(false);
+ 
+   top_container_separator_ = top_container_->AddChildView(
+       ContentsSeparator::CreateContentsSeparator());
+@@ -1188,19 +1203,6 @@ BrowserView::BrowserView(Browser* browser)
+   horizontal_tab_strip_region_insertion_index_ =
+       GetIndexOf(horizontal_tab_strip_region_view_.get());
+ 
+-  auto* const vertical_tab_strip_state_controller =
+-      tabs::VerticalTabStripStateController::From(browser_);
+-  if (vertical_tab_strip_state_controller) {
+-    // TODO(466091787): just use BWI.
+-    auto vertical_tab_strip_container =
+-        std::make_unique<VerticalTabStripRegionView>(
+-            vertical_tab_strip_state_controller,
+-            browser_->GetActions()->root_action_item(), browser_, this);
+-
+-    vertical_tab_strip_region_view_ =
+-        AddChildView(std::move(vertical_tab_strip_container));
+-  }
+-
+   if (tabs::IsProjectsPanelFeatureEnabled()) {
+     auto projects_panel_container = std::make_unique<ProjectsPanelView>(
+         browser_->GetActions()->root_action_item());
+@@ -1240,7 +1242,18 @@ BrowserView::BrowserView(Browser* browser)
+ 
+   browser_->GetFeatures().InitPostBrowserViewConstruction(this);
+ 
++  // Put vertical tabs into sidebar host
++  auto* const vertical_tab_strip_state_controller =
++      tabs::VerticalTabStripStateController::From(browser_);
+   if (vertical_tab_strip_state_controller) {
++    if (!vertical_tab_strip_region_view_) {
++      auto vertical_tab_strip = std::make_unique<VerticalTabStripRegionView>(
++          vertical_tab_strip_state_controller,
++          browser_->GetActions()->root_action_item(), browser_, this);
++      vertical_tab_strip_region_view_ =
++          left_panel_view->tabs_host()->AddChildView(std::move(vertical_tab_strip));
++    }
++
+     vertical_tab_subscription_ =
+         vertical_tab_strip_state_controller->RegisterOnStateChanged(
+             base::BindRepeating(&BrowserView::OnVerticalTabStripStateChanged,
+@@ -1537,9 +1550,7 @@ bool BrowserView::ShouldDrawTabStrip() const {
+ }
+ 
+ bool BrowserView::ShouldDrawVerticalTabStrip() const {
+-  auto* controller = tabs::VerticalTabStripStateController::From(browser_);
+-  return ShouldDrawTabStrip() && controller &&
+-         controller->ShouldDisplayVerticalTabs();
++  return false;
+ }
+ 
+ bool BrowserView::IsVerticalTabStripCollapsed() const {
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index 334c2e83ba..4c7a5e9be1 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -48,10 +48,6 @@
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+ 
+-namespace {
+-constexpr int kRegionVerticalPadding = 5;
+-}  // namespace
+-
+ VerticalTabStripRegionView::VerticalTabStripRegionView(
+     tabs::VerticalTabStripStateController* state_controller,
+     actions::ActionItem* root_action_item,
+@@ -75,6 +71,10 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+ 
+   top_button_separator_ = AddChildView(std::make_unique<views::Separator>());
+ 
++  // Hide the top toolbar and the separator border
++  top_button_container_->SetVisible(false);
++  top_button_separator_->SetVisible(false);
++
+   bottom_button_container_ =
+       AddChildView(std::make_unique<VerticalTabStripBottomContainer>(
+           state_controller_, root_action_item, browser));
+@@ -109,8 +109,6 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+       base::BindRepeating(&VerticalTabStripRegionView::SetTabStripView,
+                           base::Unretained(this)));
+ 
+-  SetBackground(std::make_unique<TopContainerBackground>(
+-      browser_view, TopContainerBackground::ColorChoice::kFrameColor));
+   UpdateBackgroundColors();
+ }
+ 
+@@ -379,7 +377,7 @@ views::View* VerticalTabStripRegionView::SetTabStripView(
+       views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToZero,
+                                views::MaximumFlexSizeRule::kUnbounded));
+   tab_strip_view_->SetProperty(views::kMarginsKey,
+-                               gfx::Insets::VH(kRegionVerticalPadding, 0));
++                               gfx::Insets::VH(0, 0));
+   std::optional<size_t> separator_index = GetIndexOf(top_button_separator_);
+   CHECK(separator_index.has_value());
+   ReorderChildView(tab_strip_view_, separator_index.value() + 1);
+@@ -397,20 +395,11 @@ void VerticalTabStripRegionView::OnCollapsedStateChanged(
+     UpdateCollapseState(state_controller_->GetState());
+   }
+ 
+-  const int padding = GetLayoutConstant(
+-      state_controller_->IsCollapsed()
+-          ? LayoutConstant::kVerticalTabStripCollapsedPadding
+-          : LayoutConstant::kVerticalTabStripUncollapsedPadding);
+-  top_button_separator_->SetProperty(
+-      views::kMarginsKey, gfx::Insets::VH(kRegionVerticalPadding, padding));
+-  top_button_container_->SetProperty(
+-      views::kMarginsKey,
+-      gfx::Insets::TLBR(0, padding, kRegionVerticalPadding, padding));
+-  bottom_button_container_->SetProperty(
+-      views::kMarginsKey,
+-      gfx::Insets::TLBR(kRegionVerticalPadding, padding, 0, padding));
+-
+-  flex_layout_->SetInteriorMargin(gfx::Insets::VH(padding, 0));
++    // Remove all padding and margins
++    top_button_separator_->SetProperty(views::kMarginsKey, gfx::Insets());
++    top_button_container_->SetProperty(views::kMarginsKey, gfx::Insets());
++    bottom_button_container_->SetProperty(views::kMarginsKey, gfx::Insets());
++    flex_layout_->SetInteriorMargin(gfx::Insets());
+ 
+   if (tab_strip_view_) {
+     tab_strip_view_->SetCollapsedState(state_controller->IsCollapsed());
+diff --git a/chrome/browser/ui/views/tabs/vertical/bottom_container_button.cc b/chrome/browser/ui/views/tabs/vertical/bottom_container_button.cc
+index 781451636d..b9439ae6a6 100644
+--- a/chrome/browser/ui/views/tabs/vertical/bottom_container_button.cc
++++ b/chrome/browser/ui/views/tabs/vertical/bottom_container_button.cc
+@@ -49,15 +49,21 @@ BottomContainerButton::BottomContainerButton() {
+                 GetToolbarInkDropInsets(this), GetButtonCornerRadii()));
+ }
+ 
++void BottomContainerButton::SetBackgroundColor(SkColor color) {
++  background_color_ = color;
++  SchedulePaint();
++}
++
+ std::unique_ptr<views::ActionViewInterface>
+ BottomContainerButton::GetActionViewInterface() {
+   return std::make_unique<BottomContainerButtonActionViewInterface>(this);
+ }
+ 
+ void BottomContainerButton::OnPaintBackground(gfx::Canvas* canvas) {
+-  const SkColor color = GetColorProvider()->GetColor(
+-      kColorVerticalTabStripBottomButtonBackground);
+-
++  SkColor color = background_color_;
++  if (color == SK_ColorTRANSPARENT) {
++    color = GetColorProvider()->GetColor(kColorVerticalTabStripBottomButtonBackground);
++  }
+   cc::PaintFlags flags;
+   flags.setAntiAlias(true);
+   flags.setStyle(cc::PaintFlags::kFill_Style);
+diff --git a/chrome/browser/ui/views/tabs/vertical/bottom_container_button.h b/chrome/browser/ui/views/tabs/vertical/bottom_container_button.h
+index b5c0d06eb6..4ec1bdeaf6 100644
+--- a/chrome/browser/ui/views/tabs/vertical/bottom_container_button.h
++++ b/chrome/browser/ui/views/tabs/vertical/bottom_container_button.h
+@@ -21,6 +21,7 @@ class BottomContainerButton : public views::LabelButton,
+     kBottom,
+   };
+   BottomContainerButton();
++  void SetBackgroundColor(SkColor color);
+   ~BottomContainerButton() override = default;
+ 
+   // views::LabelButton:
+@@ -37,6 +38,7 @@ class BottomContainerButton : public views::LabelButton,
+   gfx::RoundedCornersF GetButtonCornerRadii() const;
+ 
+   FlatEdge flat_edge_ = FlatEdge::kNone;
++  SkColor background_color_ = SK_ColorTRANSPARENT;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_TABS_VERTICAL_BOTTOM_CONTAINER_BUTTON_H_
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_pinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/vertical/vertical_pinned_tab_container_view.cc
+index 30e353d7fa..e199e73edf 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_pinned_tab_container_view.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_pinned_tab_container_view.cc
+@@ -69,13 +69,7 @@ views::ProposedLayout VerticalPinnedTabContainerView::CalculateProposedLayout(
+   // Since all children are allocated the same width this will be the same for
+   // every row.
+   if (size_bounds.width().is_bounded() && size_bounds.width().value() > 0) {
+-    auto* controller = collection_node_->GetController();
+-    bool is_collapsed = controller && controller->IsCollapsed();
+-    const int region_horizontal_padding = GetLayoutConstant(
+-        is_collapsed ? LayoutConstant::kVerticalTabStripCollapsedPadding
+-                     : LayoutConstant::kVerticalTabStripUncollapsedPadding);
+-    int available_width =
+-        size_bounds.width().value() - region_horizontal_padding;
++    int available_width = size_bounds.width().value();
+ 
+     children_on_row =
+         std::min(children_on_row,
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_view.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_view.cc
+index 24db54da85..e06a3a0628 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_view.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_view.cc
+@@ -386,7 +386,10 @@ views::ProposedLayout VerticalTabView::CalculateProposedLayout(
+     const views::SizeBounds& size_bounds) const {
+   const int width = size_bounds.width().value_or(
+       VerticalTabStripRegionView::kUncollapsedMaxWidth);
+-  const int height = GetLayoutConstant(LayoutConstant::kVerticalTabHeight);
++
++  // Increase height by 10 pixels to add vertical padding to the top and bottom
++  // of the tab view.
++  const int height = GetLayoutConstant(LayoutConstant::kVerticalTabHeight) + 10;
+ 
+   views::ProposedLayout layouts;
+   layouts.host_size = gfx::Size(width, height);
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/vertical/vertical_unpinned_tab_container_view.cc
+index 2d8c76d9b9..5fb7641b3a 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_unpinned_tab_container_view.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_unpinned_tab_container_view.cc
+@@ -47,37 +47,22 @@ views::ProposedLayout VerticalUnpinnedTabContainerView::CalculateProposedLayout(
+   views::ProposedLayout layouts;
+   int width = 0;
+   int height = 0;
+-  auto* controller = collection_node_->GetController();
+-  bool is_collapsed = controller && controller->IsCollapsed();
+-
+-  const int horizontal_padding = GetLayoutConstant(
+-      is_collapsed ? LayoutConstant::kVerticalTabStripCollapsedPadding
+-                   : LayoutConstant::kVerticalTabStripUncollapsedPadding);
+   const auto children = collection_node_->GetDirectChildren();
+ 
+   // Layout children in order. Children will have their preferred height and
+   // fill available width.
+   for (auto* child : children) {
+-    // The leading inset should not be applied for tab groups when the tab strip
+-    // is collapsed since the group color line is drawn in that space.
+-    int x = views::AsViewClass<VerticalTabGroupView>(child) && is_collapsed
+-                ? 0
+-                : horizontal_padding;
+     views::SizeBounds child_bounds =
+-        views::SizeBounds(size_bounds.width().is_bounded()
+-                              ? (size_bounds.width() - (x + horizontal_padding))
+-                              : size_bounds.width(),
+-                          {});
++      views::SizeBounds(size_bounds.width(), {});
+     gfx::Rect bounds = gfx::Rect(child->GetPreferredSize(child_bounds));
+-    bounds.set_x(x);
++    bounds.set_x(0);
+ 
+     bounds.set_y(GetYForDraggedTabBounds(*child).value_or(height));
+ 
+     // If width is bounded, child views should respect the width constraints and
+-    // take up the available width excluding trailing horizontal padding.
++    // take up the entire available width.
+     if (size_bounds.width().is_bounded()) {
+-      bounds.set_width(size_bounds.width().value() - bounds.x() -
+-                       horizontal_padding);
++      bounds.set_width(size_bounds.width().value());
+     }
+     layouts.child_layouts.emplace_back(child, child->GetVisible(), bounds);
+     height += bounds.height() + kTabVerticalPadding;

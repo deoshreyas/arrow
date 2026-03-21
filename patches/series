@@ -13,3 +13,4 @@ ungoogled-chromium/macos/set-rustc-nightly-capability.patch
 
 arrow/extra/change-chromium-branding.patch
 arrow/ui/arrow-custom-sidepanel.patch
+arrow/ui/fix-sidepanel-and-better-ui.patch
