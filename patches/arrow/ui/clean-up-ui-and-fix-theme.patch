@@ -1,0 +1,77 @@
+diff --git a/chrome/browser/ui/tabs/tab_style.cc b/chrome/browser/ui/tabs/tab_style.cc
+index 55fd04bf48..576cd599f5 100644
+--- a/chrome/browser/ui/tabs/tab_style.cc
++++ b/chrome/browser/ui/tabs/tab_style.cc
+@@ -217,7 +217,7 @@ SkColor TabStyle::GetTabBackgroundColor(
+   switch (state) {
+     case TabStyle::TabSelectionState::kActive: {
+       // Change background color of the active tab
+-      return SkColorSetARGB(255, 115, 136, 232);
++      return SkColorSetARGB(25, 255, 255, 255);
+     }
+     case TabStyle::TabSelectionState::kSelected: {
+       constexpr std::array<std::array<ui::ColorId, 2>, 2> kSelectedColorIds = {
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index abd77c0407..74f765f3b3 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -528,7 +528,7 @@ FullscreenToolbarStyle GetUserPreferredToolbarStyle(bool always_show) {
+   }
+ 
+   // Background color of the browser frame
+-  SkColor frame_color = SkColorSetARGB(255, 60, 98, 60);
++  SkColor frame_color = SkColorSetARGB(255, 0, 0, 0);
+   canvas->DrawColor(frame_color);
+ 
+   auto* theme_service = ThemeServiceFactory::GetForProfile(
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 9f22eb28a4..eb5d67ae06 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -991,7 +991,7 @@ class SidePanelView : public views::View, public views::TextfieldController {
+               8));
+       
+       SkColor search_bar_foreground_color = SkColorSetARGB(255, 255, 255, 255);
+-      SkColor search_bar_background_color = SkColorSetARGB(255, 115, 136, 232);
++      SkColor search_bar_background_color = SkColorSetARGB(25, 255, 255, 255);
+ 
+       search_container->SetBackground(
+           views::CreateRoundedRectBackground(search_bar_background_color, 10));
+@@ -1003,7 +1003,6 @@ class SidePanelView : public views::View, public views::TextfieldController {
+       search_bar_ = search_container->AddChildView(std::make_unique<views::Textfield>());
+       search_bar_->SetPlaceholderText(u"Search or enter address");
+       search_bar_->SetBorder(nullptr);
+-      search_bar_->SetBackgroundColor(search_bar_background_color);
+       search_layout->SetFlexForView(search_bar_, 1);
+ 
+       search_bar_->SetController(this);
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+index af06ee0d5a..3260723aca 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+@@ -60,9 +60,6 @@ VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
+   tab_group_button_->SetButtonController(std::move(controller));
+   tab_group_button_->SetProperty(views::kElementIdentifierKey,
+                                  kSavedTabGroupButtonElementId);
++  
++  // Hide the tab group button
++  tab_group_button_->SetVisible(false);
+ 
+   new_tab_button_ = AddChildButtonFor(kActionNewTab);
+   new_tab_button_->SetProperty(views::kElementIdentifierKey,
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_view.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_view.cc
+index c5181ecd75..10040d2c93 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_view.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_view.cc
+@@ -66,9 +66,8 @@ views::ProposedLayout VerticalTabStripView::CalculateProposedLayout(
+     return layouts;
+   }
+ 
+-  const int region_horizontal_padding = GetLayoutConstant(
+-      is_collapsed_ ? LayoutConstant::kVerticalTabStripCollapsedPadding
+-                    : LayoutConstant::kVerticalTabStripUncollapsedPadding);
++  // Remove horizontal padding from the pinned tabs container
++  const int region_horizontal_padding = 0;
+ 
+   int y = 0;
+ 
