@@ -1,0 +1,41 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 9f22eb28a438b..888e7d2af4453 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -346,6 +346,9 @@
+ #include "ui/views/controls/resize_area.h"
+ #include "ui/views/controls/resize_area_delegate.h"
+ #include "base/strings/utf_string_conversions.h"
++#include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
++#include "components/omnibox/browser/autocomplete_classifier.h"
++#include "components/omnibox/browser/autocomplete_match.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/constants/ash_switches.h"
+@@ -1047,7 +1049,25 @@ class SidePanelView : public views::View, public views::TextfieldController {
+         return false;
+       }
+ 
+-      GURL url = url_formatter::FixupURL(base::UTF16ToUTF8(text));
++      GURL url;
++      if (auto* autocomplete_classifier =
++              AutocompleteClassifierFactory::GetForProfile(
++                  browser_->profile())) {
++        AutocompleteMatch match;
++        autocomplete_classifier->Classify(
++            text, /*prefer_keyword=*/false, /*allow_exact_keyword_match=*/false,
++            metrics::OmniboxEventProto::BLANK, &match,
++            /*alternate_nav_url=*/nullptr);
++        url = match.destination_url;
++      }
++
++      if (!url.is_valid()) {
++        url = url_formatter::FixupURL(base::UTF16ToUTF8(text));
++      }
++
++      if (!url.is_valid()) {
++        return true;
++      }
+ 
+       NavigateParams params(browser_, url, ui::PAGE_TRANSITION_TYPED);
+       params.window_action = NavigateParams::WindowAction::kShowWindow;
