@@ -12,9 +12,9 @@ I therefore pivoted to modifying the source code of Chromium, but the [ungoogled
 I chose Chromium because it is the most stable browser: Blink and V8 (the rendering and JavaScript engines) power not just Google Chrome but also Opera, Edge, Brave and a bunch of other browsers. In the future I'd like to experiment with Mozilla Firefox (and maybe even Safari).
 
 ## Current progress
-*(last updated: March 23rd, 2026)*
+*(last updated: June 2nd, 2026)*
 
-<img src="https://cdn.hackclub.com/019d1ad9-1e1f-7228-b558-29e59d27c32d/arrow-desktop-mockup.png" width=600>
+<img width="1148" height="752" alt="image" src="https://github.com/user-attachments/assets/aecf7618-41e5-4934-a85c-58e02675a1ad" />
 
 ## Building
 
